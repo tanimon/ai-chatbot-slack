@@ -1,0 +1,41 @@
+{
+  "name": "python-app-template",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "iac"
+  ],
+  "scripts": {
+    "check": "npm run check -ws && npm run check:secret && npm run check:spell",
+    "check:secret": "secretlint '**/*'",
+    "check:spell": "cspell '**/*.{ts,tsx}' --cache --gitignore",
+    "fix": "npm run fix -ws && npm run check:spell",
+    "sort": "sort-package-json && npm run sort -ws",
+    "update:pkgs": "ncu -u && npm run update:pkgs -ws"
+  },
+  "prettier": "@classmethod/prettier-config",
+  "dependencies": {
+    "npm-run-all2": "6.1.2"
+  },
+  "devDependencies": {
+    "@classmethod/eslint-config": "0.0.3",
+    "@classmethod/prettier-config": "0.0.3",
+    "@secretlint/secretlint-rule-preset-recommend": "8.2.4",
+    "@tsconfig/recommended": "1.0.6",
+    "@types/node": "20.12.8",
+    "cspell": "8.7.0",
+    "npm-check-updates": "16.14.20",
+    "secretlint": "8.2.4",
+    "sort-package-json": "2.10.0",
+    "source-map-support": "0.5.21",
+    "typescript": "5.4.5"
+  },
+  "engines": {
+    "node": ">= 20.x",
+    "npm": "10.7.0"
+  },
+  "volta": {
+    "node": "20.12.2",
+    "npm": "10.7.0"
+  }
+}
