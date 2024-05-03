@@ -1,9 +1,11 @@
-FROM --platform=linux/amd64 python:3.12-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
 COPY . .
 
-EXPOSE 8000
+RUN pip install -r requirements.txt
+
+EXPOSE 3000
 
 CMD [ "python", "-m", "app"]

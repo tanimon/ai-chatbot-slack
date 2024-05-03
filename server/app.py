@@ -1,17 +1,33 @@
-import http.server
-import socketserver
+import os
+import re
+
+from slack_bolt import App
+
+# ボットトークンと署名シークレットを使ってアプリを初期化する
+app = App(
+    token=os.environ.get("SLACK_BOT_TOKEN"),
+    signing_secret=os.environ.get("SLACK_SIGNING_SECRET"),
+    process_before_response=True,
+)
 
 
-class MyHandler(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"hello world")
+# ボットへのメンションに対するイベントリスナー
+@app.event("app_mention")
+def echo(event, say):
+    print(f"app_mention event: {event}")
+
+    text = event["text"]
+    channel = event["channel"]
+    thread_ts = event["ts"]
+
+    # メンションを除去
+    mention_regex = r"<@.*>"
+    payload = re.sub(mention_regex, "", text).strip()
+    print(f"payload: {payload}")
+
+    answer = f"You mentioned to me:\n```{payload}```"
+
+    say(channel=channel, thread_ts=thread_ts, text=answer)
 
 
-if __name__ == "__main__":
-    PORT = 8000
-    with socketserver.TCPServer(("", PORT), MyHandler) as httpd:
-        print(f"Server running on port {PORT}")
-        httpd.serve_forever()
+app.start(port=int(os.environ.get("PORT", 3000)))
