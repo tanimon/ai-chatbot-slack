@@ -3,7 +3,7 @@
   "ignorePaths": [],
   "dictionaryDefinitions": [],
   "dictionaries": [],
-  "words": ["apprunner", "hotswap", "pkgs"],
+  "words": ["apprunner", "hotswap", "langchain", "pkgs"],
   "ignoreWords": [],
   "import": []
 }
