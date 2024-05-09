@@ -15,7 +15,7 @@ export class MainStack extends cdk.Stack {
       "SlackSignSecret",
     );
 
-    new apprunner.Service(this, "ServerService", {
+    const serverService = new apprunner.Service(this, "ServerService", {
       source: apprunner.Source.fromAsset({
         imageConfiguration: {
           port: 3000,
@@ -29,8 +29,20 @@ export class MainStack extends cdk.Stack {
           platform: cdk.aws_ecr_assets.Platform.LINUX_AMD64,
         }),
       }),
+      cpu: apprunner.Cpu.FOUR_VCPU,
+      memory: apprunner.Memory.TEN_GB,
       healthCheck: apprunner.HealthCheck.tcp({}),
       autoDeploymentsEnabled: true,
     });
+    serverService.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        effect: cdk.aws_iam.Effect.ALLOW,
+        actions: [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+        ],
+        resources: ["*"],
+      }),
+    );
   }
 }
