@@ -1,4 +1,6 @@
-FROM python:3.12-slim
+# NOTE: Python v3.12.4を利用するとlangchainをインポートする際にエラーが発生するため、v3.12.3を利用する
+# ref: https://stackoverflow.com/questions/78593700/langchain-community-langchain-packages-giving-error-missing-1-required-keywor
+FROM python:3.12.3-slim
 
 WORKDIR /app
 
