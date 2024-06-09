@@ -2,32 +2,69 @@ import logging
 import os
 import re
 
+import boto3
 import slack_sdk
-from interpreter import interpreter
+from langchain import hub
+from langchain_aws import BedrockEmbeddings
+from langchain_aws.chat_models import ChatBedrock
+from langchain_community.vectorstores import OpenSearchVectorSearch
+from langchain_core.documents import Document
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import Runnable, RunnablePassthrough
+from opensearchpy import RequestsHttpConnection
+from requests_aws4auth import AWS4Auth  # type: ignore
 from slack_bolt import App
 
 logging.basicConfig(format="%(asctime)s %(message)s", level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+embedding = BedrockEmbeddings(
+    model_id="amazon.titan-embed-text-v2:0", region_name="us-east-1", client=None
+)
+
+credentials = boto3.Session().get_credentials()
+aws_auth = AWS4Auth(
+    refreshable_credentials=credentials,
+    region="ap-northeast-1",
+    service="aoss",
+)
+
+vectorstore = OpenSearchVectorSearch(
+    opensearch_url=os.environ["AOSS_ENDPOINT_URL"],
+    index_name=os.environ["AOSS_INDEX_NAME"],
+    embedding_function=embedding,
+    http_auth=aws_auth,
+    timeout=300,
+    use_ssl=True,
+    verify_certs=True,
+    connection_class=RequestsHttpConnection,
+    engine="faiss",
+)
+
+retriever = vectorstore.as_retriever()
 
 
-# Open InterpreterがBedrock経由でLlama3モデルを利用するように設定
-interpreter.llm.model = "bedrock/meta.llama3-70b-instruct-v1:0"
-interpreter.llm.context_window = 8000  # type: ignore
-
-# LLMが生成したコードを自動実行するように設定
-# 実行すべきでないコードが生成される可能性もあるので、この設定を利用する際は注意が必要
-interpreter.auto_run = True
-
-# Open Interpreterでus-east-1のBedrock APIが利用されるように設定
-os.environ["AWS_REGION_NAME"] = "us-east-1"
+def format_docs(docs: list[Document]) -> str:
+    return "\n\n".join([doc.page_content for doc in docs])
 
 
-def chat(message):
-    for chunk in interpreter.chat(message, display=True, stream=True):  # type: ignore
-        logging.info(f"chunk: {chunk}")
-        yield chunk
+prompt = hub.pull("rlm/rag-prompt")
+
+llm = ChatBedrock(
+    model_id="anthropic.claude-3-haiku-20240307-v1:0",
+    region_name="us-east-1",
+    client=None,
+)
+
+rag_chain: Runnable = (
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
 
 
-def remove_mention(text):
+def remove_mention(text: str) -> str:
     """メンションを除去する"""
 
     mention_regex = r"<@.*>"
@@ -40,68 +77,24 @@ app = App(
     signing_secret=os.environ.get("SLACK_SIGNING_SECRET"),
 )
 
-
 # ボットへのメンションに対するイベントリスナー
 @app.event("app_mention")
 def handle_app_mention(event, say, client: slack_sdk.WebClient):
-    print(f"app_mention event: {event}")
+    logger.debug(f"app_mention event: {event}")
 
     text = event["text"]
     channel = event["channel"]
     thread_ts = event.get("thread_ts") or event["ts"]
 
-    response = say(
-        channel=channel, thread_ts=thread_ts, text="考え中です...少々お待ちください..."
-    )
+    say(channel=channel, thread_ts=thread_ts, text="考え中です...少々お待ちください...")
 
     payload = remove_mention(text)
-    print(f"payload: {payload}")
+    logger.debug(f"payload: {payload}")
 
-    text = ""
-    prev_text_length = 0
+    result = rag_chain.invoke(payload)
+    logger.debug(f"result: {result}")
 
-    try:
-        for chunk in chat(payload):
-            content = chunk.get("content")
-            print(f"content: {content}")
-
-            if not content:
-                continue
-
-            text += str(content)
-
-            # `msg_too_long` エラー抑制のため、2000文字を超えたら新しいメッセージとして送信する
-            if len(text) > 2000:
-                text = str(content)
-                prev_text_length = len(text)
-                response = client.chat_postMessage(
-                    channel=channel, thread_ts=thread_ts, text=text
-                )
-
-            # 20文字ごとに既存のメッセージを更新することで、Streaming形式で表示させる
-            elif len(text) - prev_text_length > 20:
-                client.chat_update(
-                    channel=channel,
-                    ts=response["ts"],
-                    text=text,
-                )
-                prev_text_length = len(text)
-
-        # ループ完了後、未送信の内容が残っていればメッセージを更新
-        if len(text) > prev_text_length:
-            client.chat_update(
-                channel=channel,
-                ts=response["ts"],
-                text=text,
-            )
-    except Exception as e:
-        logging.error(
-            "エラー",
-            e,
-            e.__cause__,
-            e.__class__,
-        )
-        say(channel=channel, thread_ts=thread_ts, text=f"エラーが発生しました: {e}")
+    say(channel=channel, thread_ts=thread_ts, text=result)
 
 
 app.start(port=int(os.environ.get("PORT", 3000)))
