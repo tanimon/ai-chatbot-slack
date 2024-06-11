@@ -41,5 +41,13 @@ def handle_app_mention(event, say: Say, logger: logging.Logger):
 
     say(channel=channel, thread_ts=thread_ts, text=result)
 
+@app.error
+def handle_error(error, event, say: Say, logger: logging.Logger):
+    logger.exception(f"エラーが発生しました: {error}")
+
+    channel = event["channel"]
+    thread_ts = event.get("thread_ts") or event["ts"]
+    say(channel=channel, thread_ts=thread_ts, text=f"エラーが発生しました: {error}")
+
 
 app.start(port=int(os.environ.get("PORT", 3000)))
