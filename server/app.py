@@ -2,66 +2,11 @@ import logging
 import os
 import re
 
-import boto3
-import slack_sdk
-from langchain import hub
-from langchain_aws import BedrockEmbeddings
-from langchain_aws.chat_models import ChatBedrock
-from langchain_community.vectorstores import OpenSearchVectorSearch
-from langchain_core.documents import Document
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import Runnable, RunnablePassthrough
-from opensearchpy import RequestsHttpConnection
-from requests_aws4auth import AWS4Auth  # type: ignore
-from slack_bolt import App
+from slack_bolt import App, Say
+
+from server.rag import rag_chain
 
 logging.basicConfig(format="%(asctime)s %(message)s", level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-embedding = BedrockEmbeddings(
-    model_id="amazon.titan-embed-text-v2:0", region_name="us-east-1", client=None
-)
-
-credentials = boto3.Session().get_credentials()
-aws_auth = AWS4Auth(
-    refreshable_credentials=credentials,
-    region="ap-northeast-1",
-    service="aoss",
-)
-
-vectorstore = OpenSearchVectorSearch(
-    opensearch_url=os.environ["AOSS_ENDPOINT_URL"],
-    index_name=os.environ["AOSS_INDEX_NAME"],
-    embedding_function=embedding,
-    http_auth=aws_auth,
-    timeout=300,
-    use_ssl=True,
-    verify_certs=True,
-    connection_class=RequestsHttpConnection,
-    engine="faiss",
-)
-
-retriever = vectorstore.as_retriever()
-
-
-def format_docs(docs: list[Document]) -> str:
-    return "\n\n".join([doc.page_content for doc in docs])
-
-
-prompt = hub.pull("rlm/rag-prompt")
-
-llm = ChatBedrock(
-    model_id="anthropic.claude-3-haiku-20240307-v1:0",
-    region_name="us-east-1",
-    client=None,
-)
-
-rag_chain: Runnable = (
-    {"context": retriever | format_docs, "question": RunnablePassthrough()}
-    | prompt
-    | llm
-    | StrOutputParser()
-)
 
 
 def remove_mention(text: str) -> str:
@@ -79,7 +24,7 @@ app = App(
 
 # ボットへのメンションに対するイベントリスナー
 @app.event("app_mention")
-def handle_app_mention(event, say, client: slack_sdk.WebClient):
+def handle_app_mention(event, say: Say, logger: logging.Logger):
     logger.debug(f"app_mention event: {event}")
 
     text = event["text"]

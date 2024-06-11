@@ -12,7 +12,8 @@ RUN poetry export -f requirements.txt --output requirements.txt \
     && pip uninstall -y poetry \
     && pip install --no-cache-dir -r requirements.txt
 
-COPY app.py  ./
+COPY server ./server/
+COPY app.py ./
 
 EXPOSE 3000
 
