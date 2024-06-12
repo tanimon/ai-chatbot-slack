@@ -77,6 +77,11 @@ export class MainStack extends cdk.Stack {
         ),
       },
     );
+    const aossIndexingPrincipalArn =
+      cdk.aws_ssm.StringParameter.valueForStringParameter(
+        this,
+        "AossIndexingPrincipalArn",
+      );
 
     new cdk.aws_opensearchserverless.CfnAccessPolicy(
       this,
@@ -98,7 +103,10 @@ export class MainStack extends cdk.Stack {
                 Permission: ["aoss:*"],
               },
             ],
-            Principal: [serverServiceInstanceRole.roleArn],
+            Principal: [
+              serverServiceInstanceRole.roleArn,
+              aossIndexingPrincipalArn, // インデックス操作を行うプリンシパルのARN
+            ],
           },
         ]),
       },
