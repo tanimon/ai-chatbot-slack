@@ -112,6 +112,14 @@ export class MainStack extends cdk.Stack {
       },
     );
 
+    const aossIndexName = cdk.aws_ssm.StringParameter.valueForStringParameter(
+      this,
+      "AossIndexName",
+    );
+    const ragEnabled = cdk.aws_ssm.StringParameter.valueForStringParameter(
+      this,
+      "RagEnabled",
+    );
     const slackBotToken = cdk.aws_ssm.StringParameter.valueForStringParameter(
       this,
       "SlackBotToken",
@@ -119,10 +127,6 @@ export class MainStack extends cdk.Stack {
     const slackSignSecret = cdk.aws_ssm.StringParameter.valueForStringParameter(
       this,
       "SlackSignSecret",
-    );
-    const aossIndexName = cdk.aws_ssm.StringParameter.valueForStringParameter(
-      this,
-      "AossIndexName",
     );
 
     const serverService = new apprunner.Service(this, "ServerService", {
@@ -132,6 +136,7 @@ export class MainStack extends cdk.Stack {
           environmentVariables: {
             AOSS_ENDPOINT_URL: knowledgeBaseCollection.attrCollectionEndpoint,
             AOSS_INDEX_NAME: aossIndexName,
+            RAG_ENABLED: ragEnabled,
             SLACK_BOT_TOKEN: slackBotToken,
             SLACK_SIGNING_SECRET: slackSignSecret,
           },

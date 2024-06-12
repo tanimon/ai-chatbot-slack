@@ -55,3 +55,5 @@ rag_chain: Runnable = (
     | llm
     | StrOutputParser()
 )
+
+llm_chain: Runnable = llm | StrOutputParser()

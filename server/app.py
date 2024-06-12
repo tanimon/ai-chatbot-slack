@@ -4,17 +4,9 @@ import re
 
 from slack_bolt import App, Say
 
-from server.rag import rag_chain
+from server.rag import llm_chain, rag_chain
 
 logging.basicConfig(format="%(asctime)s %(message)s", level=logging.DEBUG)
-
-
-def remove_mention(text: str) -> str:
-    """メンションを除去する"""
-
-    mention_regex = r"<@.*>"
-    return re.sub(mention_regex, "", text).strip()
-
 
 # ボットトークンと署名シークレットを使ってアプリを初期化する
 app = App(
@@ -36,7 +28,9 @@ def handle_app_mention(event, say: Say, logger: logging.Logger):
     payload = remove_mention(text)
     logger.debug(f"payload: {payload}")
 
-    result = rag_chain.invoke(payload)
+    result = (
+        rag_chain.invoke(payload) if is_rag_enabled() else llm_chain.invoke(payload)
+    )
     logger.debug(f"result: {result}")
 
     say(channel=channel, thread_ts=thread_ts, text=result)
@@ -48,6 +42,19 @@ def handle_error(error, event, say: Say, logger: logging.Logger):
     channel = event["channel"]
     thread_ts = event.get("thread_ts") or event["ts"]
     say(channel=channel, thread_ts=thread_ts, text=f"エラーが発生しました: {error}")
+
+
+def remove_mention(text: str) -> str:
+    """メンションを除去する"""
+
+    mention_regex = r"<@.*>"
+    return re.sub(mention_regex, "", text).strip()
+
+
+def is_rag_enabled() -> bool:
+    """RAGが有効かどうかを返す"""
+
+    return os.environ.get("RAG_ENABLED", "false").lower() == "true"
 
 
 app.start(port=int(os.environ.get("PORT", 3000)))
