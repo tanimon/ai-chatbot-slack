@@ -22,6 +22,7 @@ opensearch-py = "^2.6.0"
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.4.2"
 boto3-stubs = {extras = ["boto3"], version = "^1.34.122"}
+python-dotenv = "^1.0.1"
 
 [build-system]
 requires = ["poetry-core"]
