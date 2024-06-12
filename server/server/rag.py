@@ -47,6 +47,9 @@ llm = ChatBedrock(
     model_id="anthropic.claude-3-haiku-20240307-v1:0",
     region_name="us-east-1",
     client=None,
+    model_kwargs={
+        "temperature": 0,
+    },
 )
 
 rag_chain: Runnable = (
