@@ -3,7 +3,23 @@
   "ignorePaths": [],
   "dictionaryDefinitions": [],
   "dictionaries": [],
-  "words": ["apprunner", "hotswap", "langchain", "pkgs", "VCPU"],
+  "words": [
+    "AOSS",
+    "apprunner",
+    "boto3",
+    "dotenv",
+    "faiss",
+    "hotswap",
+    "langchain",
+    "opensearch",
+    "opensearchpy",
+    "opensearchserverless",
+    "pkgs",
+    "refreshable",
+    "VCPU",
+    "vectorstore",
+    "vectorstores"
+  ],
   "ignoreWords": [],
   "import": []
 }

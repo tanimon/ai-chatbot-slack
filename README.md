@@ -1,1 +1,1 @@
-# python-app-template
+# ai-chatbot-slack
