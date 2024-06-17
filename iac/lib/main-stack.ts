@@ -1,4 +1,3 @@
-import * as apprunner from "@aws-cdk/aws-apprunner-alpha";
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 
@@ -68,15 +67,14 @@ export class MainStack extends cdk.Stack {
       },
     );
 
-    const serverServiceInstanceRole = new cdk.aws_iam.Role(
-      this,
-      "ServerServiceInstanceRole",
-      {
-        assumedBy: new cdk.aws_iam.ServicePrincipal(
-          "tasks.apprunner.amazonaws.com",
+    const slackBotFnRole = new cdk.aws_iam.Role(this, "SlackBotFnRole", {
+      assumedBy: new cdk.aws_iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [
+        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "service-role/AWSLambdaBasicExecutionRole",
         ),
-      },
-    );
+      ],
+    });
     const aossIndexingPrincipalArn =
       cdk.aws_ssm.StringParameter.valueForStringParameter(
         this,
@@ -104,7 +102,7 @@ export class MainStack extends cdk.Stack {
               },
             ],
             Principal: [
-              serverServiceInstanceRole.roleArn,
+              slackBotFnRole.roleArn,
               aossIndexingPrincipalArn, // インデックス操作を行うプリンシパルのARN
             ],
           },
@@ -129,30 +127,30 @@ export class MainStack extends cdk.Stack {
       "SlackSignSecret",
     );
 
-    const serverService = new apprunner.Service(this, "ServerService", {
-      source: apprunner.Source.fromAsset({
-        imageConfiguration: {
-          port: 3000,
-          environmentVariables: {
-            AOSS_ENDPOINT_URL: knowledgeBaseCollection.attrCollectionEndpoint,
-            AOSS_INDEX_NAME: aossIndexName,
-            RAG_ENABLED: ragEnabled,
-            SLACK_BOT_TOKEN: slackBotToken,
-            SLACK_SIGNING_SECRET: slackSignSecret,
-          },
-        },
-        asset: new cdk.aws_ecr_assets.DockerImageAsset(this, "ImageAsset", {
-          directory: "../server",
-          platform: cdk.aws_ecr_assets.Platform.LINUX_AMD64,
-        }),
-      }),
-      cpu: apprunner.Cpu.ONE_VCPU,
-      memory: apprunner.Memory.TWO_GB,
-      healthCheck: apprunner.HealthCheck.tcp({}),
-      instanceRole: serverServiceInstanceRole,
-      autoDeploymentsEnabled: true,
+    const slackBotFn = new cdk.aws_lambda.Function(this, "SlackBotFn", {
+      code: cdk.aws_lambda.Code.fromAssetImage("../server"),
+      handler: cdk.aws_lambda.Handler.FROM_IMAGE,
+      architecture: cdk.aws_lambda.Architecture.ARM_64,
+      runtime: cdk.aws_lambda.Runtime.FROM_IMAGE,
+      memorySize: 1769, // 1vCPUフルパワー @see https://docs.aws.amazon.com/ja_jp/lambda/latest/dg/gettingstarted-limits.html
+      timeout: cdk.Duration.minutes(15),
+      environment: {
+        AOSS_ENDPOINT_URL: knowledgeBaseCollection.attrCollectionEndpoint,
+        AOSS_INDEX_NAME: aossIndexName,
+        RAG_ENABLED: ragEnabled,
+        SLACK_BOT_TOKEN: slackBotToken,
+        SLACK_SIGNING_SECRET: slackSignSecret,
+      },
+      role: slackBotFnRole,
     });
-    serverService.addToRolePolicy(
+    slackBotFn.addFunctionUrl({
+      authType: cdk.aws_lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedMethods: [cdk.aws_lambda.HttpMethod.ALL],
+        allowedOrigins: ["*"],
+      },
+    });
+    slackBotFn.addToRolePolicy(
       new cdk.aws_iam.PolicyStatement({
         effect: cdk.aws_iam.Effect.ALLOW,
         actions: [
