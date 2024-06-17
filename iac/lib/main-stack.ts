@@ -161,5 +161,15 @@ export class MainStack extends cdk.Stack {
         resources: ["*"],
       }),
     );
+
+    // Slack BoltのLazyリスナーでは、内部的に自身のLambda関数を呼び出すためInvokeFunction権限が必要
+    // resourcesにslackBotFn.functionArnを指定すると循環参照が発生してしまうため、いったん緩く設定する
+    slackBotFn.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        effect: cdk.aws_iam.Effect.ALLOW,
+        actions: ["lambda:InvokeFunction"],
+        resources: ["*"],
+      }),
+    );
   }
 }
