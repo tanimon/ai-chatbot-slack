@@ -1,3 +1,4 @@
+import * as lambdaPython from "@aws-cdk/aws-lambda-python-alpha";
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 
@@ -127,11 +128,36 @@ export class MainStack extends cdk.Stack {
       "SlackSignSecret",
     );
 
+    const serverLayer = new lambdaPython.PythonLayerVersion(
+      this,
+      "ServerLayer",
+      {
+        entry: "../server",
+        bundling: {
+          assetExcludes: [
+            "**/__pycache__",
+            ".venv",
+            "scripts",
+            ".env",
+            "tests",
+            "README.md",
+            "slack_bot_handler.py",
+          ],
+        },
+        compatibleRuntimes: [cdk.aws_lambda.Runtime.PYTHON_3_12],
+        compatibleArchitectures: [cdk.aws_lambda.Architecture.ARM_64],
+      },
+    );
+
     const slackBotFn = new cdk.aws_lambda.Function(this, "SlackBotFn", {
-      code: cdk.aws_lambda.Code.fromAssetImage("../server"),
-      handler: cdk.aws_lambda.Handler.FROM_IMAGE,
+      code: cdk.aws_lambda.Code.fromAsset("../server", {
+        // ハンドラーファイルのみをLambda関数に含める
+        exclude: ["*", "!slack_bot_handler.py"],
+        ignoreMode: cdk.IgnoreMode.GIT,
+      }),
+      handler: "slack_bot_handler.handler",
+      runtime: cdk.aws_lambda.Runtime.PYTHON_3_12,
       architecture: cdk.aws_lambda.Architecture.ARM_64,
-      runtime: cdk.aws_lambda.Runtime.FROM_IMAGE,
       memorySize: 1769, // 1vCPUフルパワー @see https://docs.aws.amazon.com/ja_jp/lambda/latest/dg/gettingstarted-limits.html
       timeout: cdk.Duration.minutes(15),
       environment: {
@@ -142,7 +168,9 @@ export class MainStack extends cdk.Stack {
         SLACK_SIGNING_SECRET: slackSignSecret,
       },
       role: slackBotFnRole,
+      layers: [serverLayer],
     });
+
     slackBotFn.addFunctionUrl({
       authType: cdk.aws_lambda.FunctionUrlAuthType.NONE,
       cors: {
@@ -150,6 +178,7 @@ export class MainStack extends cdk.Stack {
         allowedOrigins: ["*"],
       },
     });
+
     slackBotFn.addToRolePolicy(
       new cdk.aws_iam.PolicyStatement({
         effect: cdk.aws_iam.Effect.ALLOW,
